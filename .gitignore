@@ -1,0 +1,21 @@
+# 1. Çevresel Değişkenler
+.venv/
+venv/
+env/
+.env
+
+# 2. Veritabanı Dosyaları
+*.db
+*.sqlite
+*.db-shm
+*.db-wal
+favori_repolarim.md
+
+# 3. Yapay Zeka Modelleri
+*.gguf
+*.bin
+
+# 4. Python Gereksiz Dosyaları
+__pycache__/
+*.pyc
+.DS_Store

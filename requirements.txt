@@ -1,0 +1,4 @@
+streamlit==1.61.1
+llama_cpp_python==0.3.35
+sqlite-vec==0.1.9
+python-dotenv==1.2.3
