@@ -1,5 +1,5 @@
 import streamlit as st
-import urllib
+import urllib.request
 import json
 import re
 from collections import defaultdict
@@ -38,9 +38,10 @@ def show_readme_dialog(repo_name, readme_content):
     with st.container(height=600):
         st.markdown(readme_content, unsafe_allow_html=True)
 
-def fetch_single_repo(repo_path):
+def fetch_single_repo(repo_path, with_readme=True):
     api_url = f"https://api.github.com/repos/{repo_path}"
-    readme_url = f"https://raw.githubusercontent.com/{repo_path}/master/README.md"
+    # Varsayılan daldaki README'yi (dal ve dosya adı fark etmeksizin) ham metin olarak döner
+    readme_url = f"https://api.github.com/repos/{repo_path}/readme"
     headers = {"User-Agent": "Repo-Agent"}
     if GITHUB_TOKEN:
         headers["Authorization"] = f"token {GITHUB_TOKEN}"
@@ -52,12 +53,14 @@ def fetch_single_repo(repo_path):
             desc = data.get("description") or "Açıklama bulunmuyor."
             stars = data.get("stargazers_count", 0)
             forks = data.get("forks_count", 0)
+        if not with_readme:
+            return data.get("full_name"), data.get("html_url"), desc, None, stars, forks
         try:
-            req_readme = urllib.request.Request(readme_url, headers=headers)
+            req_readme = urllib.request.Request(readme_url, headers={**headers, "Accept": "application/vnd.github.raw"})
             with urllib.request.urlopen(req_readme) as rm:
                 readme = rm.read().decode('utf-8')
         except:
-            readme = desc 
+            readme = desc
         return data.get("full_name"), data.get("html_url"), desc, readme, stars, forks
     except Exception as e:
         return None, None, None, None, 0, 0
@@ -89,12 +92,18 @@ Açıklama: {desc}
 <|im_start|>assistant
 """
     response = llm(prompt, max_tokens=10, temperature=0.1, stop=["<|im_end|>"])
-    kategori = response["choices"][0]["text"].strip().capitalize()
-    
+    kategori = response["choices"][0]["text"].strip()
+
     # Model halüsinasyon görüp uzun cümle kurarsa varsayılan'a dön
     if len(kategori) > 15 or len(kategori) < 2:
         return "Genel"
-    return kategori
+
+    # Aynı kategori farklı harf büyüklüğüyle zaten varsa onu kullan (Örn: 'Ai' -> 'AI')
+    for mevcut in get_all_categories():
+        if mevcut.lower() == kategori.lower():
+            return mevcut
+    # .capitalize() 'AI' -> 'Ai' yaptığı için sadece ilk harf büyütülür
+    return kategori[0].upper() + kategori[1:]
 
 def generate_markdown_table(repos):
     md_content = "# 📚 Kaydedilen GitHub Repolarım\n\n"
@@ -137,7 +146,7 @@ if st.session_state.aktif_sayfa == "Liste":
                 with st.spinner("Tüm repolar güncelleniyor... (Bu işlem sayısına göre 1-2 dakika sürebilir)"):
                     for r in tum_repolar:
                         r_id, name, url, desc, readme, stars, forks, is_pinned, category = r
-                        _, _, _, _, n_stars, n_forks = fetch_single_repo(name)
+                        _, _, _, _, n_stars, n_forks = fetch_single_repo(name, with_readme=False)
                         if n_stars > 0 or n_forks > 0:
                             update_repo_stats(r_id, n_stars, n_forks)
                             basari_sayisi += 1

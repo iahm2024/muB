@@ -21,7 +21,7 @@ pip install -r requirements.txt
 ```
 
 ### 2. Modelleri İndirin
-Sistemin çalışması için iki adet `.gguf` formatında modele ihtiyacınız var. Modelleri indirip proje ana dizinine (veya istediğiniz bir klasöre) yerleştirin:
+Sistemin çalışması için iki adet `.gguf` formatında modele ihtiyacınız var. Modelleri indirip `data/models/` klasörüne (veya istediğiniz bir klasöre) yerleştirin:
 - **Embedding Modeli:** [nomic-embed-text-v1.5.Q8_0.gguf](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF) (Metinleri vektörleştirmek için)
 - **LLM Modeli:** [qwen2.5-coder-3b-instruct-q4_k_m.gguf](https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF) (Kategorizasyon ve sohbet için)
 
@@ -29,19 +29,20 @@ Sistemin çalışması için iki adet `.gguf` formatında modele ihtiyacınız v
 Proje ana dizininde bir `.env` dosyası oluşturun ve aşağıdaki bilgileri kendi sisteminize göre doldurun:
 ```text
 GITHUB_TOKEN=ghp_sizin_github_tokeniniz
-EMBEDDING_MODEL_PATH=nomic-embed-text-v1.5.Q8_0.gguf
-LLM_MODEL_PATH=qwen2.5-coder-3b-instruct-q4_k_m.gguf
+EMBEDDING_MODEL_PATH=data/models/nomic-embed-text-v1.5.Q8_0.gguf
+LLM_MODEL_PATH=data/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
 ```
+*(Model yolları, komutları çalıştırdığınız proje ana dizinine göredir.)*
 *(Not: GitHub Token, GitHub API'nin hız sınırlarına takılmadan repo verilerini çekebilmek için zorunludur.)*
 
 ## 💻 Kullanım
 
-Tüm kurulumları tamamladıktan sonra arayüzü başlatmak için terminale şu komutu girin:
+Tüm kurulumları tamamladıktan sonra arayüzü başlatmak için proje ana dizininde şu komutu girin:
 ```bash
-streamlit run app.py
+streamlit run app/app.py
 ```
 * Tarayıcınızda açılan sekmeden sisteme tek tek repo linki yapıştırabilir, bir yazarın/şirketin tüm repolarını topluca çekebilir veya yapay zekaya sorular sorabilirsiniz.
-* Geçmişten kalan `.html` formatındaki tarayıcı yer imlerinizi (bookmarks) içe aktarmak isterseniz, `data/bookmarks.html` yoluna dosyanızı koyup `python ingest.py` betiğini çalıştırabilirsiniz.
+* Geçmişten kalan `.html` formatındaki tarayıcı yer imlerinizi (bookmarks) içe aktarmak isterseniz, `data/bookmarks.html` yoluna dosyanızı koyup proje ana dizininde `python app/ingest.py` betiğini çalıştırabilirsiniz.
 
 ## 🏗️ Kullanılan Teknolojiler
 

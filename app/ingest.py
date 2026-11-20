@@ -35,7 +35,8 @@ class BookmarkParser(HTMLParser):
 
 def fetch_github_info(repo_path):
     api_url = f"https://api.github.com/repos/{repo_path}"
-    readme_url = f"https://raw.githubusercontent.com/{repo_path}/master/README.md"
+    # Varsayılan daldaki README'yi (dal ve dosya adı fark etmeksizin) ham metin olarak döner
+    readme_url = f"https://api.github.com/repos/{repo_path}/readme"
     
     headers = {"User-Agent": "Repo-Agent"}
     if GITHUB_TOKEN:
@@ -55,7 +56,7 @@ def fetch_github_info(repo_path):
             forks = data.get("forks_count", 0)
             
         try:
-            req_readme = urllib.request.Request(readme_url, headers=headers)
+            req_readme = urllib.request.Request(readme_url, headers={**headers, "Accept": "application/vnd.github.raw"})
             with urllib.request.urlopen(req_readme) as rm:
                 readme = rm.read().decode('utf-8')
         except:

@@ -10,6 +10,7 @@ env/
 *.db-shm
 *.db-wal
 favori_repolarim.md
+data/
 
 # 3. Yapay Zeka Modelleri
 *.gguf
@@ -19,3 +20,6 @@ favori_repolarim.md
 __pycache__/
 *.pyc
 .DS_Store
+
+# 5. Yerel Claude Code ayarları
+CLAUDE.md
