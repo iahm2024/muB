@@ -8,8 +8,9 @@ Standart yer imi yöneticilerinden farklı olarak muB, kaydettiğiniz repoların
 
 - **Yerel ve Gizli:** Vektör veritabanı (SQLite-vec) ve yapay zeka modelleri (Llama.cpp) tamamen kendi bilgisayarınızda çalışır. Verileriniz dışarı çıkmaz.
 - **Hibrit Arama (Score Fusion):** Arama sonuçları; Kosinüs Benzerliği (Cosine Similarity), kelime frekansı ve repoların yıldız sayıları (logaritmik) harmanlanarak en alakalıdan en aza doğru sıralanır.
-- **Akıllı Kategorizasyon:** Sisteme eklenen her yeni repo, Qwen LLM tarafından incelenir ve içeriğine göre tek kelimelik (Frontend, Database, AI vb.) bir etiketle otomatik sınıflandırılır.
-- **Gelişmiş Arayüz:** Streamlit ile geliştirilen arayüzde; tembel yükleme (lazy loading) ile anında açılan README okuyucu, yazara veya kategoriye göre gruplama, toplu etiket düzenleme ve GitHub API üzerinden tek tıkla yıldız/fork senkronizasyonu bulunur.
+- **Akıllı Kategorizasyon:** Arayüzden eklenen her yeni GitHub reposu, Qwen LLM tarafından incelenir ve içeriğine göre tek kelimelik (Frontend, Database, AI vb.) bir etiketle otomatik sınıflandırılır. Hugging Face modelleri ise LLM'e verilmeden kendi görev etiketiyle (Text-generation, Sentence-similarity vb.) kategorilenir; etiket yoksa "Genel" olur.
+- **Hugging Face Model Desteği:** GitHub repolarının yanında Hugging Face model linkleri de eklenebilir; model kartı (README) vektörlenir, beğeni ve indirme sayıları senkronize edilir.
+- **Gelişmiş Arayüz:** Streamlit ile geliştirilen arayüzde; GitHub ve Hugging Face yer imleri için ayrı sayfalar, kaynağa göre süzülebilen yapay zeka araması, tembel yükleme (lazy loading) ile anında açılan README okuyucu, yazara veya kategoriye göre gruplama, toplu etiket düzenleme ve GitHub API üzerinden tek tıkla yıldız/fork senkronizasyonu bulunur.
 
 ## 🛠️ Kurulum
 
@@ -29,11 +30,13 @@ Sistemin çalışması için iki adet `.gguf` formatında modele ihtiyacınız v
 Proje ana dizininde bir `.env` dosyası oluşturun ve aşağıdaki bilgileri kendi sisteminize göre doldurun:
 ```text
 GITHUB_TOKEN=ghp_sizin_github_tokeniniz
+HF_TOKEN=hf_sizin_tokeniniz
 EMBEDDING_MODEL_PATH=data/models/nomic-embed-text-v1.5.Q8_0.gguf
 LLM_MODEL_PATH=data/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf
 ```
 *(Model yolları, komutları çalıştırdığınız proje ana dizinine göredir.)*
 *(Not: GitHub Token, GitHub API'nin hız sınırlarına takılmadan repo verilerini çekebilmek için zorunludur.)*
+*(Not: HF_TOKEN isteğe bağlıdır; yalnız kısıtlı (gated) veya özel modeller için gereklidir.)*
 
 ## 💻 Kullanım
 
@@ -41,15 +44,15 @@ Tüm kurulumları tamamladıktan sonra arayüzü başlatmak için proje ana dizi
 ```bash
 streamlit run app/app.py
 ```
-* Tarayıcınızda açılan sekmeden sisteme tek tek repo linki yapıştırabilir, bir yazarın/şirketin tüm repolarını topluca çekebilir veya yapay zekaya sorular sorabilirsiniz.
-* Geçmişten kalan `.html` formatındaki tarayıcı yer imlerinizi (bookmarks) içe aktarmak isterseniz, `data/bookmarks.html` yoluna dosyanızı koyup proje ana dizininde `python app/ingest.py` betiğini çalıştırabilirsiniz.
+* Tarayıcınızda açılan sekmeden sisteme tek tek repo veya Hugging Face model linki yapıştırabilir, bir yazarın/şirketin tüm repolarını topluca çekebilir veya yapay zekaya sorular sorabilirsiniz.
+* Geçmişten kalan `.html` formatındaki tarayıcı yer imlerinizi (bookmarks) içe aktarmak isterseniz (GitHub linklerinin yanında Hugging Face model linkleri de alınır), `data/bookmarks.html` yoluna dosyanızı koyup proje ana dizininde `python app/ingest.py` betiğini çalıştırabilirsiniz.
 
 ## 🏗️ Kullanılan Teknolojiler
 
 - **Arayüz:** Streamlit
 - **Vektör Veritabanı:** SQLite + sqlite-vec
 - **Yapay Zeka:** Llama.cpp (Python bindings)
-- **Veri Kaynağı:** GitHub REST API
+- **Veri Kaynağı:** GitHub REST API, Hugging Face Hub API
 
 ## 📄 Lisans
 Bu proje MIT lisansı altında açık kaynak olarak paylaşılmıştır. Dilediğiniz gibi kullanabilir ve geliştirebilirsiniz.

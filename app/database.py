@@ -35,8 +35,13 @@ def init_db():
     try:
         conn.execute("ALTER TABLE repos ADD COLUMN category TEXT DEFAULT 'Genel'")
     except sqlite3.OperationalError:
-        pass 
-        
+        pass
+
+    try:
+        conn.execute("ALTER TABLE repos ADD COLUMN source TEXT DEFAULT 'github'")
+    except sqlite3.OperationalError:
+        pass
+
     conn.execute('''
         CREATE VIRTUAL TABLE IF NOT EXISTS vec_repos USING vec0(
             embedding float[768]
@@ -45,14 +50,14 @@ def init_db():
     conn.commit()
     conn.close()
 
-def insert_repo(name, url, description, readme, stars, forks, embedding_vector, category="Genel"):
+def insert_repo(name, url, description, readme, stars, forks, embedding_vector, category="Genel", source="github"):
     conn = get_db()
     try:
         cursor = conn.cursor()
         # Kategori sütununu da ekleyerek kaydediyoruz
         cursor.execute(
-            "INSERT INTO repos (name, url, description, readme, stars, forks, is_pinned, category) VALUES (?, ?, ?, ?, ?, ?, 0, ?)",
-            (name, url, description, readme, stars, forks, category)
+            "INSERT INTO repos (name, url, description, readme, stars, forks, is_pinned, category, source) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)",
+            (name, url, description, readme, stars, forks, category, source)
         )
         row_id = cursor.lastrowid
         
@@ -80,16 +85,26 @@ def cosine_similarity(v1, v2):
     if norm1 == 0 or norm2 == 0: return 0.0
     return dot / (norm1 * norm2)
 
-def search_repos(query_text, query_vector, limit=3):
+def search_repos(query_text, query_vector, limit=3, source=None):
     conn = get_db()
     vector_bytes = struct.pack(f"{len(query_vector)}f", *query_vector)
-    
-    cursor = conn.execute('''
-        SELECT r.name, r.url, r.description, r.readme, r.stars, v.embedding
-        FROM vec_repos v
-        JOIN repos r ON r.id = v.rowid
-        WHERE v.embedding MATCH ? AND k = ?
-    ''', (vector_bytes, 10))
+
+    if source:
+        # Kaynak süzgeci KNN'den sonra uygulanır; adaylar elenmesin diye tüm vektörler taranır
+        k = min(conn.execute("SELECT COUNT(*) FROM vec_repos").fetchone()[0], 4096) or 1
+        cursor = conn.execute('''
+            SELECT r.name, r.url, r.description, r.readme, r.stars, v.embedding
+            FROM vec_repos v
+            JOIN repos r ON r.id = v.rowid
+            WHERE v.embedding MATCH ? AND k = ? AND r.source = ?
+        ''', (vector_bytes, k, source))
+    else:
+        cursor = conn.execute('''
+            SELECT r.name, r.url, r.description, r.readme, r.stars, v.embedding
+            FROM vec_repos v
+            JOIN repos r ON r.id = v.rowid
+            WHERE v.embedding MATCH ? AND k = ?
+        ''', (vector_bytes, 10))
     results = cursor.fetchall()
     conn.close()
     
@@ -125,8 +140,8 @@ def search_repos(query_text, query_vector, limit=3):
 
 def get_all_repos():
     conn = get_db()
-    # Çekerken artık 9. parametre olarak category de geliyor
-    cursor = conn.execute("SELECT id, name, url, description, readme, stars, forks, is_pinned, category FROM repos ORDER BY is_pinned DESC, stars DESC")
+    # Çekerken 9. parametre category, 10. parametre source (github/huggingface)
+    cursor = conn.execute("SELECT id, name, url, description, readme, stars, forks, is_pinned, category, source FROM repos ORDER BY is_pinned DESC, stars DESC")
     results = cursor.fetchall()
     conn.close()
     return results
@@ -160,17 +175,32 @@ def update_repo_category(repo_id, new_category):
     conn.commit()
     conn.close()
 
-def get_all_categories():
-    """Açılır liste (dropdown) için benzersiz tüm kategorileri getirir."""
+def get_all_categories(source=None):
+    """Açılır liste (dropdown) için benzersiz kategorileri getirir; source verilirse yalnız o kaynağınkileri."""
     conn = get_db()
-    cursor = conn.execute("SELECT DISTINCT category FROM repos WHERE category IS NOT NULL ORDER BY category")
+    if source:
+        cursor = conn.execute("SELECT DISTINCT category FROM repos WHERE category IS NOT NULL AND source = ? ORDER BY category", (source,))
+    else:
+        cursor = conn.execute("SELECT DISTINCT category FROM repos WHERE category IS NOT NULL ORDER BY category")
     results = [row[0] for row in cursor.fetchall()]
     conn.close()
     return results
 
-def rename_category_globally(old_category, new_category):
-    """Tüm repolardaki belirli bir kategorinin adını topluca değiştirir (Örn: 'Ai' -> 'AI')."""
+def normalize_category(kategori):
+    """Kategoriyi mevcut olanlarla harf büyüklüğüne duyarsız eşleştirir; yoksa yalnız ilk harfi büyütür."""
+    # Aynı kategori farklı harf büyüklüğüyle zaten varsa onu kullan (Örn: 'Ai' -> 'AI')
+    for mevcut in get_all_categories():
+        if mevcut.lower() == kategori.lower():
+            return mevcut
+    # .capitalize() 'AI' -> 'Ai' yaptığı için sadece ilk harf büyütülür
+    return kategori[0].upper() + kategori[1:]
+
+def rename_category_globally(old_category, new_category, source=None):
+    """Belirli bir kategorinin adını topluca değiştirir (Örn: 'Ai' -> 'AI'); source verilirse yalnız o kaynakta."""
     conn = get_db()
-    conn.execute("UPDATE repos SET category = ? WHERE category = ?", (new_category, old_category))
+    if source:
+        conn.execute("UPDATE repos SET category = ? WHERE category = ? AND source = ?", (new_category, old_category, source))
+    else:
+        conn.execute("UPDATE repos SET category = ? WHERE category = ?", (new_category, old_category))
     conn.commit()
     conn.close()

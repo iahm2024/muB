@@ -3,7 +3,9 @@ import urllib.request
 from html.parser import HTMLParser
 import re
 from llama_cpp import Llama
-from database import init_db, insert_repo, get_db
+from database import init_db, insert_repo, get_db, normalize_category
+from hf import fetch_hf_model, parse_hf_model_id
+from net import opener
 import sqlite3
 
 import os
@@ -25,6 +27,7 @@ class BookmarkParser(HTMLParser):
     def __init__(self):
         super().__init__()
         self.repos = set()
+        self.hf_models = set()
     def handle_starttag(self, tag, attrs):
         if tag == 'a':
             for attr, value in attrs:
@@ -32,6 +35,10 @@ class BookmarkParser(HTMLParser):
                     match = re.search(r'github\.com/([^/]+)/([^/#?]+)', value)
                     if match:
                         self.repos.add(f"{match.group(1)}/{match.group(2)}")
+                elif attr == 'href' and 'huggingface.co' in value:
+                    model_id = parse_hf_model_id(value)
+                    if model_id:
+                        self.hf_models.add(model_id)
 
 def fetch_github_info(repo_path):
     api_url = f"https://api.github.com/repos/{repo_path}"
@@ -44,7 +51,7 @@ def fetch_github_info(repo_path):
         
     req = urllib.request.Request(api_url, headers=headers)
     try:
-        with urllib.request.urlopen(req) as response:
+        with opener.open(req) as response:
             data = json.loads(response.read().decode('utf-8'))
             
             # Bazen description null gelebilir, str() ile güvenceye alıyoruz
@@ -57,7 +64,7 @@ def fetch_github_info(repo_path):
             
         try:
             req_readme = urllib.request.Request(readme_url, headers={**headers, "Accept": "application/vnd.github.raw"})
-            with urllib.request.urlopen(req_readme) as rm:
+            with opener.open(req_readme) as rm:
                 readme = rm.read().decode('utf-8')
         except:
             readme = desc 
@@ -73,6 +80,17 @@ def repo_exists_in_db(repo_path):
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute("SELECT id FROM repos WHERE url LIKE ?", (f"%{repo_path}%",))
+        exists = cursor.fetchone() is not None
+        conn.close()
+        return exists
+    except:
+        return False
+
+def hf_model_exists_in_db(model_id):
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM repos WHERE name = ?", ("hf:" + model_id,))
         exists = cursor.fetchone() is not None
         conn.close()
         return exists
@@ -104,5 +122,27 @@ if __name__ == "__main__":
             print(f"[{i+1}/{len(repos)}] ✅ Eklendi (⭐ {stars}): {name}")
         else:
             print(f"[{i+1}/{len(repos)}] ❌ Ulaşılamadı: {repo_path}")
-            
+
+    hf_models = list(parser.hf_models)
+    print(f"\n{len(hf_models)} adet eşsiz Hugging Face modeli bulundu. İşlem başlıyor...\n")
+
+    for i, model_id in enumerate(hf_models):
+        if hf_model_exists_in_db(model_id):
+            print(f"[{i+1}/{len(hf_models)}] ⏭️ Zaten var, atlandı: {model_id}")
+            continue
+
+        name, url, desc, readme, likes, downloads, pipeline_tag = fetch_hf_model(model_id)
+        if name:
+            text_to_embed = f"Name: {name}. Description: {desc}. Context: {readme[:1000]}"
+            vector = embedder.create_embedding(text_to_embed)["data"][0]["embedding"]
+
+            # Ingest'te LLM yok: görev etiketi yoksa varsayılan kategori
+            kategori = normalize_category(pipeline_tag) if pipeline_tag else "Genel"
+            if insert_repo(name, url, desc, readme, likes, downloads, vector, kategori, source="huggingface"):
+                print(f"[{i+1}/{len(hf_models)}] ✅ Eklendi (❤️ {likes}): {name}")
+            else:
+                print(f"[{i+1}/{len(hf_models)}] ⏭️ Zaten var, atlandı: {name}")
+        else:
+            print(f"[{i+1}/{len(hf_models)}] ❌ Ulaşılamadı: {model_id}")
+
     print("\nVeritabanı güncel! Artık arayüzü başlatabilirsiniz.")
